@@ -18,7 +18,7 @@ import Vue from './runtime/index'
 
 export default Vue
 ```
-找到 `mp/runtime/index.js`，即使真正的入口文件
+找到 `mp/runtime/index.js`，即是真正的入口文件
 
 ### 平台化包装
 
@@ -37,7 +37,7 @@ if (!rootVueVM.$mp) {
   rootVueVM.$mp = {}
 }
 ```
-这里在 `$root` 也就是 Vue 根实例上添加 `$mp` 属性，后面会发现它维护了该实例对应的小程序 `App` `Page` 对象的相关信息
+这里在 `$root` 也就是 `Vue` 根实例上添加 `$mp` 属性，后面会发现它维护了该实例对应的小程序 `App` `Page` 对象的相关信息
 
 接下来是
 ```javascript
@@ -91,30 +91,10 @@ global.App({
     callHook(rootVueVM, 'onLaunch', options)
     next()
   },
-
-  // Do something when app show.
-  onShow (options = {}) {
-    mp.status = 'show'
-    this.globalData.appOptions = mp.appOptions = options
-    callHook(rootVueVM, 'onShow', options)
-  },
-
-  // Do something when app hide.
-  onHide () {
-    mp.status = 'hide'
-    callHook(rootVueVM, 'onHide')
-  },
-
-  onError (err) {
-    callHook(rootVueVM, 'onError', err)
-  },
-
-  onPageNotFound (err) {
-    callHook(rootVueVM, 'onPageNotFound', err)
-  }
+  // ...
 })
 ```
-执行了 `global.App()`，这里的 global 是哪里定义的呢？
+执行了 `global.App()`，这里的 `global` 是哪里定义的呢？
 在 `mp/join-code-in-build.js` 中
 ```javascript
 exports.mpBanner = `// fix env
@@ -156,7 +136,7 @@ try {
 ```
 其中 `banner: mpBanner` 会在打包时注入，从而挂在全局 `global`
 
-回到之前的代码，主要是在各个生命周期函数中修改实例 `mp.status`，小程序 option 参数代理访问和调用钩子。以 onLaunch 为例，
+回到之前的代码，主要是在各个生命周期函数中修改实例 `mp.status`，小程序 `option` 参数代理访问和调用钩子。以 `onLaunch` 为例，
 ```javascript
 // Do something initial when launch.
 onLaunch (options = {}) {
@@ -171,7 +151,7 @@ onLaunch (options = {}) {
 然后修改 `mp.status` 状态，将参数 options 维护在 `globalData.appOptions`
 最后调用钩子 `callHook(rootVueVM, 'onLaunch', options)`
 
-看一下 callHook 的代码
+看一下 `callHook` 的代码
 ```javascript
 export function callHook (vm, hook, params) {
   let handlers = vm.$options[hook]
@@ -200,8 +180,11 @@ export function callHook (vm, hook, params) {
 ```javascript
 let handlers = vm.$options[hook]
 ```
-`vm.$options` 是 vue 选项合并的最终结果，从中取到对应的钩子函数数组 handlers，然后遍历依次执行，这就解释了为什么 mpvue 兼容小程序生命周期
+`vm.$options` 是 `vue` 选项合并的最终结果，从中取到对应的钩子函数数组 `handlers`，然后遍历依次执行，这就解释了为什么 `mpvue` 兼容小程序生命周期
 
-
-
+`callHook` 之后是：
+```javascript
+next()
+```
+这个 `next` 是 `initMP` 的一个入参，那么它是什么呢？
 

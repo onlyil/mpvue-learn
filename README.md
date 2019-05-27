@@ -1,5 +1,3 @@
-[TOC]
-
 ### 源码
 
 [mpvue github](https://github.com/Meituan-Dianping/mpvue)
@@ -34,7 +32,7 @@ export default Vue
 import { initMP } from './lifecycle'
 Vue.prototype._initMP = initMP
 ```
-
+后面我们会知道这个 `initMP` 方法会在 vue 初始化的最后一步 $mount 方法中执行
 来到 `./lifecycle`，找到 `initMP` 函数，这个函数有点长，我们慢慢看
 首先是这段
 ```javascript
@@ -59,7 +57,7 @@ if (mp.status) {
   return next()
 }
 ```
-首先判断 `mp.status` 如果存在，说明该实例已经初始化过，继续判断 `mpType` ，根据类型调用不同的生命周期钩子，然后执行转入的 `next`
+首先判断 `mp.status` 如果存在，说明该实例已经初始化过，继续判断 `mpType` ，根据类型调用不同的生命周期钩子，然后执行传入的 `next`
 
 ### 初始化生命周期
 
@@ -277,6 +275,7 @@ function collectVmData (vm, res = {}) {
 - `$k` 指的是该组件自身的标识符
 - `$kk` 指的是该组件自身的标识符前缀
 
+暂未发现这些标识的用处～
 回到 `initDataToMP`，执行 `page.setData(data)` 为笑程序页面初始化数据
 
 #### 更新
@@ -299,3 +298,28 @@ export function updateDataToMP () {
 }
 ```
 其大体结构同上，只是在 `setData` 之前做了 `diff` 和 节流
+
+#### Diff
+
+##### `mpvue` 更新机制的问题
+
+在 `Vue` 的 web 平台下，数据更新有一个关键的方法 `Vue.prototype.__patch__`，主要任务就是通过 `diff` 对 `vnode` 进行逐层遍历，删除旧节点，插入新节点，而这些都涉及到 web 平台的 DOM 操作，但小程序是没有 DOM 操作的，无法通过更新后的 `vnode` 映射到视图，只能得到更新的后的 `data` 然后 `page.setData` 让小程序实现更新。
+
+这样导致的结果就是页面中的任意一个组件的任意一个数据更新，最后都会将整个页面的数据传给 `page.setData`，大量的数据更新会带来性能问题。
+解决这个问题的思路是，我们只需要将变化的数据传给 `page.setData` 即可，比如 `this.a = 1;` 将 `a` 标记即可，我们知道对 `data` 进行赋值会触发访问器属性的 `set`，mpvue 就是在这个时候进行了标记，来到 `core/observer/index.js`，
+```javascript
+Object.defineProperty(obj, key, {
+  // ...
+  set: function reactiveSetter (newVal) {
+    // ...
+    if (!obj.__keyPath) {
+      def(obj, '__keyPath', {}, false)
+    }
+    obj.__keyPath[key] = true
+    if (newVal instanceof Object && !(newVal instanceof Array)) {
+      // 标记是否是通过this.Obj = {} 赋值印发的改动，解决少更新问题#1305
+      def(newVal, '__newReference', true, false)
+    }
+  }
+})
+```
